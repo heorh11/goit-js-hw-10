@@ -1,64 +1,61 @@
-import { fetchBreeds, fetchCatByBreed } from './cat-api.js';
+import { fetchBreeds, fetchCatByBreed } from "./cat-api";
+import './styles.css';
+import { Notify } from 'notiflix/build/notiflix-notify-aio';
+import SlimSelect from 'slim-select'
+import 'slim-select/dist/slimselect.css';
 
-const breedSelect = document.querySelector('.breed-select');
-const loader = document.querySelector('.loader');
-const error = document.querySelector('.error');
-const catInfo = document.querySelector('.cat-info');
-const catImage = document.querySelector('.cat-image');
-const catName = document.querySelector('.cat-name');
-const catDescription = document.querySelector('.cat-description');
-const catTemperament = document.querySelector('.cat-temperament');
+const ref = {
+    selector: document.querySelector('.breed-select'),
+    divCatInfo: document.querySelector('.cat-info'),
+    loader: document.querySelector('.loader'),
+    error: document.querySelector('.error'),
+};
+const { selector, divCatInfo, loader, error } = ref;
 
-// Function to populate breed options in the select element
-async function populateBreeds() {
-  try {
-    const breeds = await fetchBreeds();
-    breeds.forEach((breed) => {
-      const option = document.createElement('option');
-      option.value = breed.id;
-      option.textContent = breed.name;
-      breedSelect.appendChild(option);
+loader.classList.replace('loader', 'is-hidden');
+error.classList.add('is-hidden');
+divCatInfo.classList.add('is-hidden');
+
+let arrBreedsId = [];
+fetchBreeds()
+.then(data => {
+    data.forEach(element => {
+        arrBreedsId.push({text: element.name, value: element.id});
     });
-  } catch (err) {
-    console.error('Error fetching breeds:', err);
-    showError();
-  }
-}
+    new SlimSelect({
+        select: selector,
+        data: arrBreedsId
+    });
+    })
+.catch(onFetchError);
 
+selector.addEventListener('change', onSelectBreed);
 
-async function displayCatInfo(breedId) {
-  try {
-    const catData = await fetchCatByBreed(breedId);
-    const cat = catData[0];
-    catImage.src = cat.url;
-    catName.textContent = cat.breeds[0].name;
-    catDescription.textContent = cat.breeds[0].description;
-    catTemperament.textContent = `Temperament: ${cat.breeds[0].temperament}`;
-    catInfo.style.display = 'block';
-  } catch (err) {
-    console.error('Error fetching cat info:', err);
-    showError();
-  }
-}
+function onSelectBreed(event) {
+    loader.classList.replace('is-hidden', 'loader');
+    selector.classList.add('is-hidden');
+    divCatInfo.classList.add('is-hidden');
 
+    const breedId = event.currentTarget.value;
+    fetchCatByBreed(breedId)
+    .then(data => {
+        loader.classList.replace('loader', 'is-hidden');
+        selector.classList.remove('is-hidden');
+        const { url, breeds } = data[0];
+        divCatInfo.innerHTML = `<div class="box-img"><img src="${url}" alt="${breeds[0].name}" width="400"/></div><div class="box"><h1>${breeds[0].name}</h1><p>${breeds[0].description}</p><p><b>Temperament:</b> ${breeds[0].temperament}</p></div>`
+        divCatInfo.classList.remove('is-hidden');
+    })
+    .catch(onFetchError);
+};
 
-function hideLoader() {
-  loader.style.display = 'none';
-}
+function onFetchError(error) {
+    selector.classList.remove('is-hidden');
+    loader.classList.replace('loader', 'is-hidden');
 
-
-function showError() {
-  error.style.display = 'block';
-}
-
-
-breedSelect.addEventListener('change', (event) => {
-  const breedId = event.target.value;
-  catInfo.style.display = 'none';
-  loader.style.display = 'block';
-  error.style.display = 'none';
-  displayCatInfo(breedId).then(hideLoader);
-});
-
-
-populateBreeds().then(hideLoader);
+    Notify.failure('Oops! Something went wrong! Try reloading the page or select another cat breed!', {
+        position: 'center-center',
+        timeout: 5000,
+        width: '400px',
+        fontSize: '24px'
+    });
+};
